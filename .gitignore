@@ -5,4 +5,7 @@ build/
 install/
 log/
 
+core 
+core.*
+
 data

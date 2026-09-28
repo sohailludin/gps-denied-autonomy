@@ -6,6 +6,7 @@ docker run -it --rm \
   --ipc host \
   -v /dev:/dev \
   --device=/dev:/dev \
+  --device=/dev/video0:/dev/video0 \
   -v /run/udev:/run/udev:ro \
   -v $(pwd):/workspace \
-  gps-denied:ros_system
+  gps-denied:ros_system_updated
