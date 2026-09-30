@@ -9,8 +9,6 @@
 #include <libcamera/camera_manager.h>
 
 
-
-
 using namespace libcamera;
 using namespace std::chrono_literals;
 static std::shared_ptr<Camera> camera;

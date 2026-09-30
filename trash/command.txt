@@ -1,0 +1,6 @@
+g++ main.cpp \
+  -I/usr/local/include/libcamera \
+  -L/usr/local/lib/aarch64-linux-gnu -lcamera -lcamera-base \
+  -lcamera \
+  -lcamera-base \
+  -o main
