@@ -9,6 +9,7 @@
 #include <libcamera/camera_manager.h>
 #include <libcamera/framebuffer_allocator.h> 
 #include <libcamera/stream.h> 
+#include<libcamera/framebuffer.h>
 
 
 using namespace libcamera;
@@ -92,16 +93,18 @@ for (unsigned int i = 0; i < buffers.size(); ++i) {
 
 
 
+camera->requestCompleted.connect(requestComplete);
+
 for (std::unique_ptr<Request> &request : requests)
    {camera->queueRequest(request.get());}
 
 
-camera->requestCompleted.connect(requestComplete);
+   const std::map<const Stream *, FrameBuffer *> &buffers = request->buffers();
 
-for (std::unique_ptr<Request> &request : requests)
-   camera->queueRequest(request.get());
-
-
+for (auto bufferPair : buffers) {
+    FrameBuffer *buffer = bufferPair.second;
+    const FrameMetadata &metadata = buffer->metadata();}
+        
 
 
 camera->stop();
@@ -121,6 +124,5 @@ static void requestComplete(Request *request)
 {
    if (request->status() == Request::RequestCancelled)
    return;
-   const std::map<const Stream *, FrameBuffer *> &buffers = request->buffers();
-
+ 
 }
