@@ -69,6 +69,7 @@ for (StreamConfiguration &cfg : *config) {
 camera->start();
 Stream *stream = streamConfig.stream();
 const std::vector<std::unique_ptr<FrameBuffer>> &buffers = allocator->buffers(stream);
+
 std::vector<std::unique_ptr<Request>> requests;
 
 for (unsigned int i = 0; i < buffers.size(); ++i) {
@@ -99,7 +100,7 @@ for (std::unique_ptr<Request> &request : requests)
    {camera->queueRequest(request.get());}
 
 
-   const std::map<const Stream *, FrameBuffer *> &buffers = request->buffers();
+const std::map<const Stream *, FrameBuffer *> &buffers = request->buffers();
 
 for (auto bufferPair : buffers) {
     FrameBuffer *buffer = bufferPair.second;
@@ -122,7 +123,7 @@ return 0;
 
 static void requestComplete(Request *request)
 {
-   if (request->status() == Request::RequestCancelled)
+   if (request->status() == Request::RequestComplete)
    return;
  
 }

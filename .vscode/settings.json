@@ -1,3 +1,5 @@
 {
-    "cmake.sourceDirectory": "/home/sohailludin/gps-denied/src/imu_driver_ros"
+    "cmake.sourceDirectory": "/home/sohailludin/gps-denied/src/imu_driver_ros",
+    "terminal.integrated.fontSize": 13,
+    "terminal.integrated.fontWeight": "normal"
 }
