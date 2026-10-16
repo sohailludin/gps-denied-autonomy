@@ -4,3 +4,9 @@ g++ main.cpp \
   -lcamera \
   -lcamera-base \
   -o main
+
+
+
+g++ main.cpp \
+ $(pkg-config --cflags --libs libcamera opencv4) \
+ -o main

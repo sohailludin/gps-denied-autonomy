@@ -10,6 +10,9 @@
 #include <libcamera/framebuffer_allocator.h> 
 #include <libcamera/stream.h> 
 #include<libcamera/framebuffer.h>
+#include <sys/mman.h>
+#include <opencv4/core/mat.hpp>
+
 
 
 using namespace libcamera;
@@ -20,6 +23,7 @@ static void requestComplete(Request *request);
 
 int main()
 {
+
 std::unique_ptr<CameraManager> cm = std::make_unique<CameraManager>();
 
 cm->start();
@@ -50,7 +54,7 @@ std::cout << "Default viewfinder configuration is: " << streamConfig.toString() 
 config->validate();
 std::cout << "Validated viewfinder configuration is: " << streamConfig.toString() << std::endl;
 camera->configure(config.get());
-
+std::cout << "Stride: " << streamConfig.stride << '\n';
 
 //Memory Allocation
 auto allocator = std::make_unique<FrameBufferAllocator>(camera);
@@ -63,10 +67,10 @@ for (StreamConfiguration &cfg : *config) {
     }
 
     size_t allocated = allocator->buffers(cfg.stream()).size();
-    std::cout << "Allocated " << allocated << " buffers for stream" << std::endl;
+    std::cout << "Allocated " << allocated << " buffers for stream \n\n" << std::endl;
 }
 
-camera->start();
+
 Stream *stream = streamConfig.stream();
 const std::vector<std::unique_ptr<FrameBuffer>> &buffers = allocator->buffers(stream);
 
@@ -90,31 +94,44 @@ for (unsigned int i = 0; i < buffers.size(); ++i) {
     }
 
     requests.push_back(std::move(request));
+  
+}
+
+camera->requestCompleted.connect(requestComplete); 
+
+camera->start();
+
+
+
+for (std::unique_ptr<Request> &request : requests){
+   camera->queueRequest(request.get());
+   
 }
 
 
-
-camera->requestCompleted.connect(requestComplete);
-
-for (std::unique_ptr<Request> &request : requests)
-   {camera->queueRequest(request.get());}
+std::this_thread::sleep_for(2s);
 
 
-const std::map<const Stream *, FrameBuffer *> &buffers = request->buffers();
-
-for (auto bufferPair : buffers) {
-    FrameBuffer *buffer = bufferPair.second;
-    const FrameMetadata &metadata = buffer->metadata();}
-        
 
 
-camera->stop();
+
+
+camera -> stop();
+
+
+
+requests.clear();
+
 allocator->free(stream);
 allocator.reset();
+
 camera->release();
 camera.reset();
-cm->stop();
 
+cameras.clear();
+
+
+cm->stop();
 return 0;
 
 }
@@ -123,7 +140,38 @@ return 0;
 
 static void requestComplete(Request *request)
 {
-   if (request->status() == Request::RequestComplete)
-   return;
+   if (request->status() == Request::RequestCancelled)
+    return;
  
+    const std::map<const Stream *, FrameBuffer *> &buffers = request->Request::buffers();
+
+    for (auto bufferPair : buffers) {
+    FrameBuffer *buffer = bufferPair.second;
+    const FrameMetadata &metadata = buffer->metadata();
+
+    std::cout << "seq: " << std::setw(6) << std::setfill('0') << metadata.sequence << " bytesused: ";
+    
+    unsigned int nplane = 0;
+    for (const FrameMetadata::Plane &plane : metadata.planes())
+    {
+        std::cout << plane.bytesused;
+        if (++nplane < metadata.planes().size()) std::cout << "/";
+    }
+
+    std::cout << std::endl;
+
+            
+    
+    for (const FrameBuffer::Plane &plane : buffer->planes()) {
+    std::cout << "FD: " << plane.fd.get() << '\n';
+    std::cout << "Offset: " << plane.offset << '\n';
+    std::cout << "Length: " << plane.length << '\n';
+    void *ptr = mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), plane.offset);
+    std::cout << "Adress: " << ptr << "\n\n\n";
+    return ptr;
+    }
+    cv::
+
+}       
 }
+ 
