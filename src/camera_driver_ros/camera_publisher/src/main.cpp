@@ -11,7 +11,9 @@
 #include <libcamera/stream.h> 
 #include<libcamera/framebuffer.h>
 #include <sys/mman.h>
-#include <opencv4/core/mat.hpp>
+#include <opencv2/core/mat.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 
 
@@ -168,10 +170,17 @@ static void requestComplete(Request *request)
     std::cout << "Length: " << plane.length << '\n';
     void *ptr = mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), plane.offset);
     std::cout << "Adress: " << ptr << "\n\n\n";
-    return ptr;
+    cv::Mat image(600, 800, CV_8UC4, ptr, 3200);
+    cv::Mat bgr;
+    cv::cvtColor(image, bgr, cv::COLOR_BGRA2BGR);
+    cv::imwrite("frame.png", bgr);
+    
     }
-    cv::
 
-}       
+
+ 
+   
+
+    }       
 }
  
