@@ -106,15 +106,14 @@ camera->start();
 
 
 for (std::unique_ptr<Request> &request : requests){
-   camera->queueRequest(request.get());
-   
+    
+    camera->queueRequest(request.get());
+  
+ 
 }
 
 
-std::this_thread::sleep_for(2s);
-
-
-
+std::this_thread::sleep_for(10s);
 
 
 
@@ -147,7 +146,7 @@ static void requestComplete(Request *request)
  
     const std::map<const Stream *, FrameBuffer *> &buffers = request->Request::buffers();
 
-    for (auto bufferPair : buffers) {
+    for (auto bufferPair : buffers) {   
     FrameBuffer *buffer = bufferPair.second;
     const FrameMetadata &metadata = buffer->metadata();
 
@@ -169,18 +168,27 @@ static void requestComplete(Request *request)
     std::cout << "Offset: " << plane.offset << '\n';
     std::cout << "Length: " << plane.length << '\n';
     void *ptr = mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), plane.offset);
+    if (ptr == MAP_FAILED) {
+    std::cerr << "mmap fehlgeschlagen\n";
+    continue;
+}
+
+    
     std::cout << "Adress: " << ptr << "\n\n\n";
     cv::Mat image(600, 800, CV_8UC4, ptr, 3200);
     cv::Mat bgr;
     cv::cvtColor(image, bgr, cv::COLOR_BGRA2BGR);
     cv::imwrite("frame.png", bgr);
+
+    munmap(ptr, plane.length);
     
     }
 
-
- 
+    }
+    request->reuse(Request::ReuseBuffers);
+    camera->queueRequest(request);
    
 
-    }       
+        
 }
  

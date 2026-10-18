@@ -8,5 +8,5 @@ g++ main.cpp \
 
 
 g++ main.cpp \
-  $(pkg-config --cflags --libs libcamera opencv4) \
-  -o main
+ $(pkg-config --cflags --libs libcamera libopencv-dev) \
+ -o main
