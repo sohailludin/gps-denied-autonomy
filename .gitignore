@@ -1,10 +1,11 @@
 .venv
 __pycache__/
 .lgd-nfy0
-build/
-install/
+/home/sohailludin/gps-denied/build
+/home/sohailludin/gps-denied/install
 log/
-trash
+
+/home/sohailludin/gps-denied/trash
 core 
 core.*
 
