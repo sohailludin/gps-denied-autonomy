@@ -21,7 +21,7 @@
 
 #include "../include/camera.hpp"
 
-
+using namespace std::chrono_literals;
 
 //Funktionsdefinitionen 
 
@@ -79,12 +79,6 @@ bool CameraDriver::acquireCamera(){
     int acquire = camera_->acquire();
 
     if (acquire < 0) {
-                camera_.reset();
-                cameras.clear();
-
-
-                cm_->stop();
-                cm_.reset();
                 return false;
             }
         acquired_ = true;
@@ -187,17 +181,93 @@ void CameraDriver::cleanup()
 
     allocator_.reset();
     stream_ = nullptr;
-
     config_.reset();
 
     if (camera_ && acquired_) {
-        // Kamera freigeben, falls acquire() erfolgreich war
         camera_->release();
-        acquired_ = false;
-        
     }
+
+    acquired_ = false;
+    camera_.reset();
 
     cm_.reset();
 
     initialized_ = false;
+    running_ = false;
+};
+
+
+bool CameraDriver::start() {
+        if (!initialized_){return false;};
+        if(!running_){return false;};
+        camera_->requestCompleted.connect(this, &CameraDriver::requestComplete); 
+
+        camera_->start();
+
+        for (std::unique_ptr<libcamera::Request> &request : requests_){
+        
+        camera_->queueRequest(request.get());
+        
+        
+        };
+
+
+        std::this_thread::sleep_for(10s);
+
+        running_ = true;
+        return true;
+
+
+};
+
+void CameraDriver::requestComplete(libcamera::Request *request) {
+                if (request->status() == libcamera::Request::RequestCancelled)
+                return;
+ 
+    const std::map<const libcamera::Stream *, libcamera::FrameBuffer *> &buffers = request->libcamera::Request::buffers();
+
+    for (auto bufferPair : buffers) {   
+        libcamera::FrameBuffer *buffer = bufferPair.second;
+        const libcamera::FrameMetadata &metadata = buffer->metadata();
+
+        std::cout << "seq: " << std::setw(6) << std::setfill('0') << metadata.sequence << " bytesused: ";
+        
+        unsigned int nplane = 0;
+        for (const libcamera::FrameMetadata::Plane &plane : metadata.planes())
+        {
+                std::cout << plane.bytesused;
+                        if (++nplane < metadata.planes().size()) std::cout << "/";
+        }
+
+        std::cout << std::endl;
+
+            
+    
+        for (const libcamera::FrameBuffer::Plane &plane : buffer->planes()) {
+                std::cout << "FD: " << plane.fd.get() << '\n';
+                std::cout << "Offset: " << plane.offset << '\n';
+                std::cout << "Length: " << plane.length << '\n';
+                void *ptr = mmap(nullptr, plane.length, PROT_READ, MAP_SHARED, plane.fd.get(), plane.offset);
+                        if (ptr == MAP_FAILED) {
+                        std::cerr << "mmap fehlgeschlagen\n";
+                        continue;}
+
+    
+                        std::cout << "Adress: " << ptr << "\n\n\n";
+                        cv::Mat image(600, 800, CV_8UC4, ptr, 3200);
+                        cv::Mat bgr;
+                        cv::cvtColor(image, bgr, cv::COLOR_BGRA2BGR);
+                        cv::imwrite("frame.png", bgr);
+
+                        munmap(ptr, plane.length);
+                        
+                        }
+
+    }
+    
+    request->reuse(libcamera::Request::ReuseBuffers);
+    camera_->queueRequest(request);
+
+   
+
 };

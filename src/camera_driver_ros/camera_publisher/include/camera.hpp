@@ -32,8 +32,9 @@ private:
     bool configureCamera();
     bool allocateBuffers();
     bool createRequests();
-    void requestComplete(libcamera::Request *request);
     void cleanup();
+
+    void requestComplete(libcamera::Request *request);
 
     std::unique_ptr<libcamera::CameraManager> cm_;
     std::shared_ptr<libcamera::Camera> camera_;
