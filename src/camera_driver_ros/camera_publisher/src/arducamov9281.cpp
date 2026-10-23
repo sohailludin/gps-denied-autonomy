@@ -199,7 +199,7 @@ void CameraDriver::cleanup()
 
 bool CameraDriver::start() {
         if (!initialized_){return false;};
-        if(!running_){return false;};
+        if(running_){return true;};
         camera_->requestCompleted.connect(this, &CameraDriver::requestComplete); 
 
         camera_->start();
