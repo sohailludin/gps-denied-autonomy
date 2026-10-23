@@ -22,15 +22,16 @@
 using namespace std::chrono_literals;
 
 
-int main() {
-CameraDriver driver;
+int main() 
+{
+    CameraDriver driver;
 
-if (!driver.initialize())
-    return 1;
+    driver.initialize();
+    driver.start();
 
-if (!driver.start())
-    return 1;
+    std::this_thread::sleep_for(std::chrono::seconds(10));
 
-std::this_thread::sleep_for(10s);
+    driver.stop();
 
-driver.stop();}
+    return 0;
+}

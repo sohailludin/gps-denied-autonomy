@@ -175,7 +175,8 @@ bool CameraDriver::createRequests(){
 
 void CameraDriver::cleanup()
 {
-        stop();
+    stop();
+
     requests_.clear();
 
     allocator_.reset();
@@ -194,7 +195,6 @@ void CameraDriver::cleanup()
     initialized_ = false;
     running_ = false;
 };
-
 
 bool CameraDriver::start()
 {
@@ -314,4 +314,11 @@ void CameraDriver::stop() {
         camera_->requestCompleted.disconnect(
                 this, &CameraDriver::requestComplete
     );
+    
+};
+
+
+CameraDriver::~CameraDriver()
+{
+    cleanup();
 }

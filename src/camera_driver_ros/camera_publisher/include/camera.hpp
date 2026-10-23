@@ -23,6 +23,7 @@ public:
     bool initialize();
     bool start();
     void stop();
+    ~CameraDriver();
 
 
 private:
