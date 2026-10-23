@@ -22,11 +22,29 @@
 #include "../include/camera.hpp"
 
 
+
 //Funktionsdefinitionen 
 
 bool CameraDriver::initialize()
-{
-    //Kamera Manager Initialisieren
+
+{       if (initialized_)
+                return true;
+
+        if(!acquireCamera()|| !configureCamera() || !allocateBuffers() || !createRequests())
+        {
+                cleanup();
+                return false;
+        }
+
+        initialized_ = true;
+
+        return true;
+  
+    
+};
+
+bool CameraDriver::acquireCamera(){
+         //Kamera Manager Initialisieren
     cm_ = std::make_unique<libcamera::CameraManager>();
     int response = cm_->start();
 
@@ -53,6 +71,8 @@ bool CameraDriver::initialize()
             std::cerr << "Camera not found" << std::endl;
 
             // Ressourcen aufräumen
+                cm_->stop();
+                cm_.reset();
             return false;
             }
 
@@ -67,36 +87,117 @@ bool CameraDriver::initialize()
                 cm_.reset();
                 return false;
             }
+        acquired_ = true;
+  return true;
 
-    //Kamera Konfiguration - In this case the cameras configuration is beeing set automatically to the best fitting
+};
+
+
+bool CameraDriver::configureCamera(){
+     //Kamera Konfiguration - In this case the cameras configuration is beeing set automatically to the best fitting
     config_ = camera_->generateConfiguration( { libcamera::StreamRole::Viewfinder } );
+        if (!config_ || config_->size() == 0) {
+                        std::cout << "No configuration list" << std::endl;
+                        return false;}
+
     libcamera::StreamConfiguration &streamConfig = config_->at(0);
+
     std::cout << "Default viewfinder configuration is: " << streamConfig.toString() << std::endl;
     
     auto status = config_->validate();
-    if (status == libcamera::CameraConfiguration::Invalid) {
-            std::cerr << "Invalid camera configuration" << std::endl;
-            // Ressourcen aufräumen
-            return false;}
+                if (status == libcamera::CameraConfiguration::Invalid) {
+                        std::cerr << "Invalid camera configuration" << std::endl;
+                        // Ressourcen aufräumen
+                        return false;}
 
-        std::cout << "Validated viewfinder configuration is: " << streamConfig.toString() << std::endl;
+                        std::cout << "Validated viewfinder configuration is: " << streamConfig.toString() << std::endl;
     
     auto configure = camera_->configure(config_.get());
-    if (configure < 0) {
-            std::cerr << "Failed camera configuration" << std::endl;
-            // Ressourcen aufräumen
-            return false;}
+        if (configure < 0) {
+                std::cerr << "Failed camera configuration" << std::endl;
+                // Ressourcen aufräumen
+                return false;}
 
-        std::cout << "Stride: " << streamConfig.stride << '\n';
+                std::cout << "Stride: " << streamConfig.stride << '\n';
     
-    config_->at(0);
-    if (!config_ || config_->size() == 0) {
-            std::cout << "No configuration list" << std::endl;
-            return false;}
-
-
+    
     return true;
 
-  
-    
+}
+
+bool CameraDriver::allocateBuffers(){
+    //Speicher/Buffer Allokation 
+    allocator_ = std::make_unique<libcamera::FrameBufferAllocator>(camera_);
+
+        for (libcamera::StreamConfiguration &cfg : *config_) {
+                int ret = allocator_->allocate(cfg.stream());
+                        if (ret < 0) {
+                                std::cerr << "Can't allocate buffers" << std::endl;
+                                camera_.reset();
+                                cm_->stop();
+                                cm_.reset();
+                                return false;
+                        }
+
+                size_t allocated = allocator_->buffers(cfg.stream()).size();
+                std::cout << "Allocated " << allocated << " buffers for stream \n\n" << std::endl;
+                                
+                };      
+                return true;
+
+}
+
+bool CameraDriver::createRequests(){
+        libcamera::StreamConfiguration &streamConfig = config_->at(0);
+        stream_ = streamConfig.stream();
+        if (!stream_){
+
+                return false;
+        }
+        const std::vector<std::unique_ptr<libcamera::FrameBuffer>> &buffers = allocator_->buffers(stream_);
+
+
+                for (unsigned int i = 0; i < buffers.size(); ++i) {
+                std::unique_ptr<libcamera::Request> request = camera_->createRequest();
+                if (!request)
+                {
+                        std::cerr << "Can't create request" << std::endl;
+                        return false;
+                }
+
+                const std::unique_ptr<libcamera::FrameBuffer> &buffer = buffers[i];
+                int ret = request->addBuffer(stream_, buffer.get());
+                if (ret < 0)
+                {
+                        std::cerr << "Can't set buffer for request"<< std::endl;
+                        return false;
+                }
+
+                requests_.push_back(std::move(request));
+                
+                }
+        return true;
+
+
+};
+
+void CameraDriver::cleanup()
+{
+    requests_.clear();
+
+    allocator_.reset();
+    stream_ = nullptr;
+
+    config_.reset();
+
+    if (camera_ && acquired_) {
+        // Kamera freigeben, falls acquire() erfolgreich war
+        camera_->release();
+        acquired_ = false;
+        
+    }
+
+    cm_.reset();
+
+    initialized_ = false;
 };

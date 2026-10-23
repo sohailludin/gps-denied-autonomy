@@ -22,11 +22,18 @@ public:
     bool initialize();
     bool start();
     void stop();
-    bool status() const;
+
 
 private:
-    bool initialized_ = false;
-    bool running_ = false;
+    bool initialized_ = false; //Sind alle Ressourcen für die Aufnahme vorbereitet ?
+    bool running_ = false; // Läuft die Aufnahme gerade ? 
+    bool acquired_ = false; //Ist die Kamera reserviert ?
+    bool acquireCamera();
+    bool configureCamera();
+    bool allocateBuffers();
+    bool createRequests();
+    void requestComplete(libcamera::Request *request);
+    void cleanup();
 
     std::unique_ptr<libcamera::CameraManager> cm_;
     std::shared_ptr<libcamera::Camera> camera_;
@@ -37,5 +44,5 @@ private:
 
     std::vector<std::unique_ptr<libcamera::Request>> requests_;
 
-    void requestComplete(libcamera::Request *request);
+    
 };

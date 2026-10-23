@@ -15,3 +15,11 @@ g++ main.cpp \
 g++ arducamov9281.cpp \
  $(pkg-config --cflags --libs libcamera opencv4) \
  -o cam
+
+
+
+ //Komando für Kompilierung in Objektdatei kein Ausführbares Programm
+
+ g++ -std=c++17 main.cpp arducamov9281.cpp \
+  $(pkg-config --cflags --libs libcamera opencv4) \
+  -o cam
