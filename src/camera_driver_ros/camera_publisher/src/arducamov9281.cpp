@@ -127,9 +127,7 @@ bool CameraDriver::allocateBuffers(){
                 int ret = allocator_->allocate(cfg.stream());
                         if (ret < 0) {
                                 std::cerr << "Can't allocate buffers" << std::endl;
-                                camera_.reset();
-                                cm_->stop();
-                                cm_.reset();
+                        
                                 return false;
                         }
 
@@ -177,6 +175,7 @@ bool CameraDriver::createRequests(){
 
 void CameraDriver::cleanup()
 {
+        stop();
     requests_.clear();
 
     allocator_.reset();
@@ -197,28 +196,54 @@ void CameraDriver::cleanup()
 };
 
 
-bool CameraDriver::start() {
-        if (!initialized_){return false;};
-        if(running_){return true;};
-        camera_->requestCompleted.connect(this, &CameraDriver::requestComplete); 
+bool CameraDriver::start()
+{
+    if (!initialized_)
+        return false;
 
-        camera_->start();
-
-        for (std::unique_ptr<libcamera::Request> &request : requests_){
-        
-        camera_->queueRequest(request.get());
-        
-        
-        };
-
-
-        std::this_thread::sleep_for(10s);
-
-        running_ = true;
+    if (running_.load())
         return true;
 
+    camera_->requestCompleted.connect(
+        this, &CameraDriver::requestComplete
+    );
 
-};
+    int ret = camera_->start();
+
+    if (ret < 0) {
+        camera_->requestCompleted.disconnect(
+            this, &CameraDriver::requestComplete
+        );
+        return false;
+    }
+
+    running_.store(true);
+
+    for (auto &request : requests_) {
+
+        // Wichtig beim erneuten Start nach stop()
+        if (request->status() != libcamera::Request::RequestPending) {
+            request->reuse(libcamera::Request::ReuseBuffers);
+        }
+
+        ret = camera_->queueRequest(request.get());
+
+        if (ret < 0) {
+            std::cerr << "Failed to queue request: " << ret << '\n';
+
+            running_.store(false);
+            camera_->stop();
+
+            camera_->requestCompleted.disconnect(
+                this, &CameraDriver::requestComplete
+            );
+
+            return false;
+        }
+    }
+
+    return true;
+}
 
 void CameraDriver::requestComplete(libcamera::Request *request) {
                 if (request->status() == libcamera::Request::RequestCancelled)
@@ -257,17 +282,36 @@ void CameraDriver::requestComplete(libcamera::Request *request) {
                         cv::Mat image(600, 800, CV_8UC4, ptr, 3200);
                         cv::Mat bgr;
                         cv::cvtColor(image, bgr, cv::COLOR_BGRA2BGR);
-                        cv::imwrite("frame.png", bgr);
+                        //cv::imwrite("frame.png", bgr);
 
                         munmap(ptr, plane.length);
                         
                         }
 
     }
-    
-    request->reuse(libcamera::Request::ReuseBuffers);
-    camera_->queueRequest(request);
+        if (!running_.load())
+        return;
 
-   
+        request->reuse(libcamera::Request::ReuseBuffers);
+
+        int ret = camera_->queueRequest(request);
+
+    
 
 };
+
+
+void CameraDriver::stop() {
+        if (!running_.exchange(false))
+                return;
+
+        int ret = camera_->stop();
+
+        if (ret < 0) {
+                std::cerr << "Failed to stop camera: " << ret << '\n';
+        }
+
+        camera_->requestCompleted.disconnect(
+                this, &CameraDriver::requestComplete
+    );
+}

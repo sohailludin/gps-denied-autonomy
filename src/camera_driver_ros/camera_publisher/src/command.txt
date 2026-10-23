@@ -8,12 +8,12 @@ g++ main.cpp \
 
 
 g++ main.cpp \
- $(pkg-config --cflags --libs libcamera libopencv-dev) \
+ $(pkg-config --cflags --libs libcamera opencv4) arducamov9281.cpp  \
  -o main
 
 
 g++ arducamov9281.cpp \
- $(pkg-config --cflags --libs libcamera opencv4) \
+ $(pkg-config --cflags --libs libcamera opencv4) arducamov9281.cpp \
  -o cam
 
 
@@ -23,3 +23,8 @@ g++ arducamov9281.cpp \
  g++ -std=c++17 main.cpp arducamov9281.cpp \
   $(pkg-config --cflags --libs libcamera opencv4) \
   -o cam
+
+
+g++ arducamov9281.cpp \
+ $(pkg-config --cflags --libs libcamera opencv4) \
+ -o cam

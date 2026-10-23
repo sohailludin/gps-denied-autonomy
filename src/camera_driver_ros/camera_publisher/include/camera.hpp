@@ -14,6 +14,7 @@
 #include <opencv2/core/mat.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
+#include <atomic>
 
 
 class CameraDriver
@@ -26,7 +27,7 @@ public:
 
 private:
     bool initialized_ = false; //Sind alle Ressourcen für die Aufnahme vorbereitet ?
-    bool running_ = false; // Läuft die Aufnahme gerade ? 
+    std::atomic<bool> running_{false};  // Läuft die Aufnahme gerade ? 
     bool acquired_ = false; //Ist die Kamera reserviert ?
     bool acquireCamera();
     bool configureCamera();
