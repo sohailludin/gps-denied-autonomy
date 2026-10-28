@@ -328,10 +328,10 @@ void CameraDriver::stop() {
 CameraDriver::~CameraDriver()
 {
     cleanup();
-}
+};
 
 
-int CameraDriver::getFrame()
+cv::Mat CameraDriver::getFrame()
 
 {   
 

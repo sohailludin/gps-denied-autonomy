@@ -23,7 +23,7 @@ public:
     bool initialize();
     bool start();
     void stop();
-    int getFrame();
+    cv::Mat getFrame();
     ~CameraDriver();
 
 
