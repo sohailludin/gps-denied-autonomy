@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <mutex>
 
 #include <libcamera/camera.h>
 #include <libcamera/camera_manager.h>
@@ -22,6 +23,7 @@
 #include "../include/camera.hpp"
 
 using namespace std::chrono_literals;
+
 
 //Funktionsdefinitionen 
 
@@ -276,13 +278,18 @@ void CameraDriver::requestComplete(libcamera::Request *request) {
                         if (ptr == MAP_FAILED) {
                         std::cerr << "mmap fehlgeschlagen\n";
                         continue;}
-
-    
+                        
                         std::cout << "Adress: " << ptr << "\n\n\n";
                         cv::Mat image(600, 800, CV_8UC4, ptr, 3200);
                         cv::Mat bgr;
                         cv::cvtColor(image, bgr, cv::COLOR_BGRA2BGR);
+                        {
+                        std::lock_guard<std::mutex> lock(mtx);
+                        image_raw_ = bgr;
+                        }
+       
                         //cv::imwrite("frame.png", bgr);
+                    
 
                         munmap(ptr, plane.length);
                         
@@ -321,4 +328,22 @@ void CameraDriver::stop() {
 CameraDriver::~CameraDriver()
 {
     cleanup();
+}
+
+
+int CameraDriver::getFrame()
+
+{   
+
+    cv::Mat image_clone;
+    {
+    std::lock_guard<std::mutex> lock(mtx);
+    
+    image_clone = image_raw_.clone();
+    }
+   
+
+    return image_clone;
+
+
 }

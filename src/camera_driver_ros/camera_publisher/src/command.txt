@@ -7,7 +7,7 @@ g++ main.cpp \
 
 
 
-g++ main.cpp \
+g++ -std=c++17 main.cpp \
  $(pkg-config --cflags --libs libcamera opencv4) arducamov9281.cpp  \
  -o main
 

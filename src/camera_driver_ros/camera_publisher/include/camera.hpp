@@ -23,6 +23,7 @@ public:
     bool initialize();
     bool start();
     void stop();
+    int getFrame();
     ~CameraDriver();
 
 
@@ -35,6 +36,8 @@ private:
     bool allocateBuffers();
     bool createRequests();
     void cleanup();
+    std::mutex mtx;
+    cv::Mat image_raw_; 
 
     void requestComplete(libcamera::Request *request);
 
