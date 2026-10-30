@@ -17,7 +17,6 @@
 using namespace std::chrono_literals;
 CameraDriver driver_;
 
-pointer = driver_.requestComplete.&ptr;
 
 class CameraPublisher : public rclcpp::Node
 {
@@ -27,28 +26,36 @@ class CameraPublisher : public rclcpp::Node
         : Node ("cam_publisher")
         {
             driver_.initialize();
+            driver_.start();
             publisher_ = this -> create_publisher<sensor_msgs::msg::Image>("camera/image_raw");
            
         }
 
         void cam_callback(){
-            driver_.start();
+
             auto image_raw = sensor_msgs::msg::Image();
-            image_raw.data = driver_.requestComplete.image(600, 800, CV_8UC4, ptr, 3200)
+            cv::Mat lib_image = driver.getFrame();
+            image_raw.height = lib_image.rows;
+            image_raw.width = lib_image.width;
+            image_raw.encoding = lib_image.flags;
+            while (i < lib_image.rows) {
+                while(j < lib_image.step) {
+
+                    image_raw.data = lib_image.data;
+                }
+            }
+            
             image_raw.header.stamp = this -> now();
             image_raw.header.frame_id = "camera_link"
             publisher_->publish(image_raw);
-
-            std::this_thread::sleep_for(std::chrono::seconds(10));
-            driver.stop();
+            
 
             if (image_clone.empty())
-    {return cv::Mat{};}
+            {return cv::Mat{};}
 
         }
 
-    rclcpp::TimerBase::SharedPtr timer_;
-  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_;
+ rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_;
 }
 
 

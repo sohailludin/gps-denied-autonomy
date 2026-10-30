@@ -13,7 +13,7 @@ g++ -std=c++17 main.cpp \
 
 
 g++ arducamov9281.cpp \
- $(pkg-config --cflags --libs libcamera opencv4) arducamov9281.cpp \
+ $(pkg-config --cflags --libs libcamera opencv4 ros2) arducamov9281.cpp \
  -o cam
 
 
@@ -28,3 +28,7 @@ g++ arducamov9281.cpp \
 g++ arducamov9281.cpp \
  $(pkg-config --cflags --libs libcamera opencv4) \
  -o cam
+
+ g++ -std=c++17 camera_publisher.cpp \
+  $(pkg-config --cflags --libs libcamera opencv4 ros2) \
+  -o cam
