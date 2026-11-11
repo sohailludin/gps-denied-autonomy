@@ -25,6 +25,8 @@
 using namespace std::chrono_literals;
 
 
+
+
 //Funktionsdefinitionen 
 
 bool CameraDriver::initialize()
@@ -248,6 +250,7 @@ bool CameraDriver::start()
 }
 
 void CameraDriver::requestComplete(libcamera::Request *request) {
+    
                 if (request->status() == libcamera::Request::RequestCancelled)
                 return;
  
@@ -271,6 +274,9 @@ void CameraDriver::requestComplete(libcamera::Request *request) {
             
     
         for (const libcamera::FrameBuffer::Plane &plane : buffer->planes()) {
+
+            
+
                 std::cout << "FD: " << plane.fd.get() << '\n';
                 std::cout << "Offset: " << plane.offset << '\n';
                 std::cout << "Length: " << plane.length << '\n';
@@ -285,7 +291,9 @@ void CameraDriver::requestComplete(libcamera::Request *request) {
                         cv::cvtColor(image, bgr, cv::COLOR_BGRA2BGR);
                         {
                         std::lock_guard<std::mutex> lock(mtx);
-                        image_raw_ = bgr;
+                        CameraDriver::Data.image_data = bgr;
+                        CameraDriver::Data.sequence_number = metadata.sequence;
+                        CameraDriver::Data.time_stamp = metadata.timestamp;
                         }
        
                         //cv::imwrite("frame.png", bgr);
@@ -331,19 +339,21 @@ CameraDriver::~CameraDriver()
 };
 
 
-cv::Mat CameraDriver::getFrame()
+struct CameraDriver::CameraData CameraDriver::getFrame()
 
 {   
 
-    cv::Mat image_clone;
+    CameraData Publisher_Data;
     {
     std::lock_guard<std::mutex> lock(mtx);
     
-    image_clone = image_raw_.clone();
+    Publisher_Data.image_data = Data.image_data.clone();
+    Publisher_Data.sequence_number = Data.sequence_number;
+    Publisher_Data.time_stamp = Data.time_stamp;
     }
    
 
-    return image_clone;
+    return Publisher_Data;
 
 
 }

@@ -3,6 +3,9 @@
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <mutex>
+#include <vector>
+#include <cstdint>
 //#include "camera_driver_ros/camera.hpp"
 
 #include <libcamera/camera.h>
@@ -23,8 +26,14 @@ public:
     bool initialize();
     bool start();
     void stop();
-    cv::Mat getFrame();
+    
     ~CameraDriver();
+    struct CameraData {
+        cv::Mat image_data;
+        uint64_t sequence_number;
+        uint64_t time_stamp;
+    };
+    struct CameraData getFrame();
 
 
 private:
@@ -37,7 +46,7 @@ private:
     bool createRequests();
     void cleanup();
     std::mutex mtx;
-    cv::Mat image_raw_; 
+    CameraData Data;
 
     void requestComplete(libcamera::Request *request);
 
