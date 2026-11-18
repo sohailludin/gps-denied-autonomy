@@ -1,8 +1,8 @@
 # GPS-Denied Autonomy
 
-A Raspberry Pi 5-based C++/ROS 2 platform for GPS-denied localization using a global-shutter camera and IMU.
+A Raspberry Pi 5-based C++/ROS 2 platform for developing GPS-denied localization with a global-shutter camera and an IMU.
 
-**Current milestone (23 October 2026):** the IMU pipeline is operational end-to-end in ROS 2. A standalone C++ `CameraDriver` for the OV9281 now acquires frames through `libcamera`, including stream configuration, buffer allocation, request submission, and completion callbacks. Repeated start/stop capture has been tested. **Clean camera shutdown still needs verification, and camera frames are not yet published to ROS 2.**
+**Current milestone — 18 November 2026:** Both sensor pipelines publish data through ROS 2 Humble. The custom OV9281 camera driver is integrated into a ROS 2 node, publishing images on `/camera/image_raw` at **~29.8–29.9 Hz**. A separate ROS 2 subscriber successfully saved and displayed an **800 × 600** camera image. The IMU pipeline publishes accelerometer and gyroscope data on `/imu/data_raw` at approximately **100 Hz**. **Camera–IMU time synchronization, calibration, and visual-inertial odometry (VIO) are not yet implemented or validated.**
 
 ---
 
@@ -10,7 +10,7 @@ A Raspberry Pi 5-based C++/ROS 2 platform for GPS-denied localization using a gl
 
 ### Hardware
 - Raspberry Pi 5, 4 GB
-- ArduCam OV9281 global-shutter monochrome camera
+- Arducam OV9281 global-shutter monochrome camera
 - TDK/InvenSense ICM-20948 IMU
 - Integrated AK09916 magnetometer
 
@@ -22,7 +22,7 @@ A Raspberry Pi 5-based C++/ROS 2 platform for GPS-denied localization using a gl
 - **IMU interface:** Linux `i2c-dev`, `ioctl`, `libi2c`
 - **Camera interface:** `libcamera` / Raspberry Pi PiSP pipeline
 - **Computer vision:** OpenCV
-- **Build tooling:** GCC, CMake, `ament_cmake`, `colcon`
+- **Build tooling:** GCC, CMake, `ament_cmake`, `colcon`, `pkg-config`
 - **libcamera build:** Meson + Ninja
 - **Analysis / tooling:** Python
 
@@ -36,7 +36,7 @@ A Raspberry Pi 5-based C++/ROS 2 platform for GPS-denied localization using a gl
                     ┌─────────────┴─────────────┐
                     │                           │
                  CAMERA                        IMU
-               ArduCam OV9281              ICM-20948
+               Arducam OV9281              ICM-20948
                     │                           │
                     ▼                           ▼
                 libcamera              Linux I²C / libi2c
@@ -45,15 +45,16 @@ A Raspberry Pi 5-based C++/ROS 2 platform for GPS-denied localization using a gl
              C++ CameraDriver           Custom C++ IMU Driver
                     │                           │
                     ▼                           ▼
-          [planned] ROS 2 Image          ROS 2 IMU Publisher
-                 Publisher                      │
+             ROS 2 CameraPublisher        ROS 2 ImuPublisher
                     │                           │
                     ▼                           ▼
-           /camera/image_raw               /imu/data_raw
+             /camera/image_raw             /imu/data_raw
+               ~29.8–29.9 Hz                 ~100 Hz
                     │                           │
                     └─────────────┬─────────────┘
                                   ▼
-                      [planned] Timing + Calibration
+                       [planned] Common Timing,
+                         Sensor Calibration
                                   │
                                   ▼
                        [planned] Visual-Inertial
@@ -63,7 +64,7 @@ A Raspberry Pi 5-based C++/ROS 2 platform for GPS-denied localization using a gl
                         [goal] 6-DoF Pose Estimate
                                   │
                                   ▼
-                           ROS 2 / Vehicle API
+                       [goal] ROS 2 / Vehicle API
 ```
 
 ### Current implementation
@@ -80,9 +81,9 @@ ICM-20948
 → /imu/data_raw @ ~100 Hz
 ```
 
-Accelerometer, gyroscope, temperature, and AK09916 magnetometer access are implemented. Accelerometer and gyroscope measurements are published through ROS 2.
+Accelerometer, gyroscope, temperature, and AK09916 magnetometer access are implemented. Accelerometer and gyroscope measurements are published through ROS 2. IMU calibration and noise/bias characterization remain open.
 
-**Camera path — standalone C++ capture working; ROS 2 integration pending**
+**Camera path — operational in ROS 2**
 
 ```text
 OV9281
@@ -95,28 +96,78 @@ OV9281
    → createRequests()
 → CameraDriver::start()
    → requestCompleted callback
-   → frame metadata + mapped buffer access (mmap)
-   → OpenCV frame conversion / test image output
+   → frame metadata + buffer access (mmap)
+   → OpenCV conversion to BGR
+   → mutex-protected latest-frame snapshot
    → request reuse + requeue
-→ CameraDriver::stop()
-→ [next] safe frame handoff to a ROS 2 publisher
-→ [next] sensor_msgs/msg/Image on /camera/image_raw
+→ CameraPublisher (ROS 2 timer)
+   → CameraDriver::getFrame()
+   → skip already-published sequence numbers
+   → sensor_msgs/msg/Image (bgr8)
+→ /camera/image_raw @ ~29.8–29.9 Hz
+→ independent ROS 2 image_saver subscriber (verified)
 ```
 
-The refactor separates camera acquisition, stream configuration, buffer allocation, request construction, capture control, and resource cleanup into a `CameraDriver` class. The current test code uses OpenCV to convert captured frames and write a `frame.png` for inspection. This is a debugging step, **not** the final frame-delivery mechanism.
+The `CameraDriver` separates acquisition, stream configuration, buffer allocation, request construction, capture control, and resource cleanup. A `CameraData` structure groups the latest OpenCV image, libcamera frame sequence number, and camera timestamp. The producer updates these together under a mutex; the getter creates a consistent snapshot, including an independent copy of the pixel data.
 
-### Latest camera test results
+The sensor is monochrome, but the current implementation converts the capture buffer to **`bgr8`** for ROS 2 publication. A future `mono8` path could avoid unnecessary conversion and reduce bandwidth.
 
-- OV9281 discovered and configured through `libcamera`.
-- Frame buffers allocated and capture requests submitted successfully.
-- `requestCompleted` callbacks received with frame metadata; image-buffer mapping and OpenCV processing exercised.
-- Capture runs for approximately 10 seconds in the standalone test.
-- A `start() → stop() → start() → stop()` test also ran for approximately 20 seconds.
-- **Open issue:** the process previously logged `ERROR Camera camera.cpp:600 Removing camera while still in use` during exit. Final destruction/release behavior must be retested after wiring `cleanup()` into the `CameraDriver` destructor. Successful frame capture does not yet imply a clean shutdown.
+### Verified camera results — 18 November 2026
+
+- The OV9281 is detected and configured through libcamera inside the Docker-based ROS 2 environment.
+- Framebuffer allocation, queued capture requests, completion callbacks, and requeueing operate continuously; sequence numbers increase across captured frames.
+- The ROS 2 node builds and starts using libcamera **0.7.2**.
+- `/camera/image_raw` publishes at approximately **29.8–29.9 messages/s** in a sustained `ros2 topic hz` test.
+- The transmitted image was saved by the independent ROS 2 `image_saver` node and visually inspected: **800 × 600 pixels**, recognizable grayscale scene.
+- `header.frame_id` is set to `camera_frame`.
+- The current `header.stamp` uses **`this->now()` at publisher processing time**, not the original sensor acquisition timestamp. This is intentionally temporary and **not sufficient for VIO synchronization**.
+- Earlier standalone testing also exercised `start() → stop() → start() → stop()`. Clean ROS 2 shutdown and all failure paths are **not yet independently verified**.
+
+### Build and run the ROS 2 camera publisher
+
+Run these commands **inside the configured Docker container** from the ROS 2 workspace root (`/workspace` in the tested environment). This assumes the ROS 2 Humble dependencies and the locally built libcamera/PiSP stack are already available.
+
+```bash
+cd /workspace
+source /opt/ros/humble/setup.bash
+
+colcon build --packages-select camera_publisher --symlink-install \
+  --cmake-args -DPKG_CONFIG_USE_CMAKE_PREFIX_PATH=FALSE
+
+source install/setup.bash
+ros2 run camera_publisher camera_publisher
+```
+
+In another container terminal, with the ROS 2 environment sourced:
+
+```bash
+ros2 topic hz /camera/image_raw
+ros2 topic echo /camera/image_raw --once --field header
+```
+
+To capture a single image without a graphical display, install the ROS 2 image tools if necessary and run the saver node:
+
+```bash
+apt update && apt install -y ros-humble-image-view
+
+ros2 run image_view image_saver \
+  --ros-args \
+  -r image:=/camera/image_raw \
+  -p save_all_image:=false \
+  -p filename_format:=/workspace/camera_test%04i.jpg
+```
+
+In a separate terminal, trigger a save and inspect the generated file:
+
+```bash
+ros2 service call /save std_srvs/srv/Empty '{}'
+```
+
+`rqt_image_view` is also an option when a graphical display is available. In the tested headless container, it failed with `could not connect to display`; `image_saver` worked as an alternative.
 
 ### Standalone camera test build
 
-From the directory containing `main.cpp` and `arducamov9281.cpp`, with the relevant development libraries available:
+For the separate standalone test application, from the directory containing `main.cpp` and `arducamov9281.cpp`:
 
 ```bash
 g++ -std=c++17 main.cpp arducamov9281.cpp \
@@ -126,7 +177,27 @@ g++ -std=c++17 main.cpp arducamov9281.cpp \
 ./main
 ```
 
-This command builds the standalone test executable, **not** a ROS 2 camera-publisher node.
+This builds the standalone test executable, **not** the ROS 2 camera publisher.
+
+### Build/debugging note: multiple libcamera installations
+
+The container had two libcamera installations. A ROS 2 build initially loaded **libcamera 0.1.0** from `/opt/ros/humble/lib`, despite a separate **libcamera 0.7.2** installation under `/usr/local/lib/aarch64-linux-gnu`.
+
+- `pkg-config --modversion libcamera` in the shell reported `0.7.2`.
+- CMake's `FindPkgConfig` initially found version `0.1.0` because additional CMake prefix paths influenced package discovery.
+- Building with `-DPKG_CONFIG_USE_CMAKE_PREFIX_PATH=FALSE` allowed CMake to discover `0.7.2` in the tested environment.
+- `ldd` was used to verify that the resulting executable loaded `libcamera.so.0.7`.
+- A separate missing `libpisp` runtime dependency was diagnosed and fixed locally; the precise fix is not documented here.
+
+Useful diagnostic commands:
+
+```bash
+pkg-config --modversion libcamera
+pkg-config --variable=libdir libcamera
+ldd /workspace/install/camera_publisher/lib/camera_publisher/camera_publisher | grep libcamera
+```
+
+Do **not** mix library files or create cross-version symlinks to work around incompatible libcamera SONAMEs. The `rosdep` key `libcamera` resolves to `ros-humble-libcamera` in this environment; avoid inadvertently replacing or mixing it with the local `/usr/local` installation.
 
 ---
 
@@ -139,16 +210,20 @@ This command builds the standalone test executable, **not** a ROS 2 camera-publi
 | AK09916 magnetometer access | ✅ Complete |
 | ROS 2 IMU publisher | ✅ Complete |
 | ~100 Hz `/imu/data_raw` stream | ✅ Verified |
-| Build Raspberry Pi `libcamera` inside Docker | ✅ Complete |
+| Build Raspberry Pi libcamera inside Docker | ✅ Complete |
 | Detect OV9281 from custom C++ application | ✅ Complete |
 | Configure camera stream | ✅ Tested |
 | Allocate frame buffers and prepare capture requests | ✅ Tested |
 | Receive camera frames and completion callbacks | ✅ Tested |
 | Refactor capture into reusable `CameraDriver` class | ✅ Implemented |
-| Repeated camera start / stop | ✅ Tested |
+| Repeated standalone camera start / stop | ✅ Tested |
+| Mutex-protected camera-frame handoff | ✅ Implemented |
+| ROS 2 camera publisher (`/camera/image_raw`) | ✅ Running and tested |
+| Sustained ~29.8–29.9 Hz ROS 2 image publication | ✅ Verified |
+| Save and visually inspect image via independent ROS 2 subscriber | ✅ Verified |
+| Per-frame sequence deduplication | ✅ Implemented; detailed validation pending |
 | Clean shutdown, destructor and error-path cleanup | 🚧 Verification pending |
-| Replace per-frame PNG writes with safe frame handoff | ⏳ Next |
-| ROS 2 camera publisher (`/camera/image_raw`) | ⏳ Next |
+| Camera capture-time timestamps on a shared IMU time basis | ⏳ Not yet implemented |
 | Camera / IMU timestamp validation | ⏳ Planned |
 | IMU noise + bias characterization | ⏳ Planned |
 | Camera intrinsic calibration | ⏳ Planned |
@@ -161,27 +236,30 @@ This command builds the standalone test executable, **not** a ROS 2 camera-publi
 
 ## Next Engineering Steps
 
-1. **Finalize lifecycle handling:** ensure `stop()` prevents request requeueing, disconnects the callback, and completes before buffers are destroyed; use `cleanup()` for partial initialization failures and object destruction. Confirm that the libcamera shutdown warning no longer occurs.
-2. **Separate capture from processing:** avoid synchronous `cv::imwrite()` in the completion callback. Copy or otherwise transfer completed frame data safely before the corresponding libcamera buffer is reused.
-3. **Create a ROS 2 camera publisher:** wrap `CameraDriver` in a node and publish frames as `sensor_msgs/msg/Image` on `/camera/image_raw`, with consistent encoding, dimensions, stride handling, and timestamps.
-4. **Validate the sensor streams:** test the camera topic alongside `/imu/data_raw`, then measure timing and begin camera/IMU calibration.
+1. **Preserve and harden the working camera pipeline:** verify a clean ROS 2 shutdown, request cancellation/requeue behavior, partial-initialization cleanup, and errors returned by `queueRequest()`. Reduce verbose per-frame debug output.
+2. **Validate image semantics and performance:** confirm encoding, `step`, buffer continuity, frame identity, and dropped/duplicated-frame behavior; prefer early duplicate checks before pixel copying. Derive width, height, format, and stride from the negotiated `libcamera` configuration instead of hard-coded values.
+3. **Establish correct camera acquisition timestamps:** verify the reference clock of the specific libcamera timestamp in use; map it onto a common time base and compare it with IMU measurement timing. The current `this->now()` header is only a transport smoke-test timestamp.
+4. **Calibrate sensors:** determine OV9281 intrinsics/distortion, IMU biases/noise, and camera–IMU spatial and temporal alignment.
+5. **Prototype visual-inertial estimation:** bring the validated streams into an initial VIO pipeline, then evaluate estimated trajectory, drift, and robustness.
 
-**Known prototype constraints:** the current OpenCV conversion path uses hard-coded `800 × 600`, `CV_8UC4`, and a stride of `3200` bytes. These must be derived from the negotiated `libcamera` stream configuration before treating the driver as format-independent. Callback concurrency and start/stop error paths also need testing beyond the successful capture runs.
+**Known prototype constraints:** Current capture processing uses hard-coded `800 × 600`, `CV_8UC4`, and a `3200`-byte stride; images are converted to BGR and republished as `bgr8`. The ROS 2 publisher checks sequence numbers to avoid publishing the same latest frame repeatedly, but exact frame-level deduplication and dropped-frame behavior have not been separately measured. The image timestamps currently reflect ROS 2 processing time, not camera exposure time. Start/stop behavior, error handling, bandwidth, and long-duration stability need additional testing before the system is considered a reliable synchronized sensing backbone.
 
 ---
 
 ## Goals
 
 ### Near-term
-Establish a reliable synchronized sensor backbone:
+
+Establish reliable, temporally aligned sensor streams:
 
 ```text
-OV9281 frames + ICM-20948 measurements
-                  ↓
-        timestamped ROS 2 streams
+OV9281 capture timestamps + ICM-20948 measurement timestamps
+                           ↓
+                 synchronized ROS 2 streams
 ```
 
 ### Engineering goal
+
 Build and understand the complete sensor-to-estimation stack rather than treating camera, IMU, and VIO as black boxes. The system should have clear boundaries between:
 
 - hardware access
@@ -192,4 +270,5 @@ Build and understand the complete sensor-to-estimation stack rather than treatin
 - health monitoring
 
 ### Long-term
+
 Deliver a self-contained prototype that estimates a continuously updated **6-DoF pose without GNSS/GPS** using visual-inertial data, with measurable drift, robust sensor handling, and a clean ROS 2 interface for downstream autonomous systems.
