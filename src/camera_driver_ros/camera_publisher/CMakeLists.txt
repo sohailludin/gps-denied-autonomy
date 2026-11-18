@@ -7,6 +7,14 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package (rclcpp REQUIRED)
+find_package (std_msgs REQUIRED)
+find_package (sensor_msgs REQUIRED)
+find_package (OpenCV REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBCAMERA REQUIRED IMPORTED_TARGET libcamera)
+pkg_check_modules(LIBPISP REQUIRED IMPORTED_TARGET libpisp)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -23,4 +31,38 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+
+add_executable(
+camera_publisher
+src/camera_publisher.cpp 
+src/arducamov9281.cpp)
+
+
+ament_target_dependencies(
+camera_publisher 
+rclcpp 
+sensor_msgs 
+)
+
+
+
+target_link_libraries(camera_publisher
+    ${OpenCV_LIBS}
+    PkgConfig::LIBCAMERA
+    PkgConfig::LIBPISP
+)
+
+install(TARGETS
+  camera_publisher
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+target_include_directories(camera_publisher PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${OpenCV_INCLUDE_DIRS}
+)
+
 ament_package()
+
+
+

@@ -32,3 +32,12 @@ g++ arducamov9281.cpp \
  g++ -std=c++17 camera_publisher.cpp \
   $(pkg-config --cflags --libs libcamera opencv4 ros2) \
   -o cam
+
+
+
+  readelf -d /usr/local/lib/aarch64-linux-gnu libpisp.so| grep SONAME
+
+  readelf -d /usr/local/lib/aarch64-linux-gnu/libpisp.so | grep SONAME
+
+
+  

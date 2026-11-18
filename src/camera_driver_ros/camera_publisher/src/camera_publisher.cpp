@@ -84,15 +84,17 @@ public rclcpp::Node
            
                         
                 
-                    int64_t time = this -> now().nanoseconds();
+                   /*  int64_t time = this -> now().nanoseconds();
                     clock_gettime(CLOCK_MONOTONIC, &start)
                     int64_t monotonictime = start.tv_sec * 1'000'000'000LL + start.tv_nsec;
-                    int64_t offset = time - monotonictime;  
+                    int64_t offset = time - monotonictime;   */
 
-                    image_raw.header.stamp.sec = (offset + lib_image.time_stamp) / 1000000000  ;
-                    image_raw.header.stamp.nanosec = (offset + lib_image.time_stamp) % 1000000000;
-
-
+                    /* image_raw.header.stamp.sec = (offset + lib_image.time_stamp) / 1000000000  ;
+                    image_raw.header.stamp.nanosec = (offset + lib_image.time_stamp) % 1000000000; */
+                    /* image_raw.header.stamp.sec = lib_image.time_stamp / 1000000000;
+                    image_raw.header.stamp.nanosec = lib_image.time_stamp % 1000000000;
+ */
+                    image_raw.header.stamp = this->now();
                     image_raw.header.frame_id = "camera_frame";
                     publisher_->publish(image_raw);
                     last_sequence_number_published = lib_image.sequence_number;

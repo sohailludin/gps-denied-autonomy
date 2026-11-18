@@ -1,0 +1,1 @@
+/workspace/build/camera_publisher/ament_cmake_core/camera_publisherConfig.cmake
