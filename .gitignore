@@ -6,6 +6,10 @@ __pycache__/
 log/
 build/
 
+/install
+/trash
+/build
+
 /home/sohailludin/gps-denied/trash
 core 
 core.*

@@ -16,6 +16,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 
 #include "imu_driver_ros/icm.hpp"
@@ -51,33 +52,34 @@ public:
 
 private:
   void timer_callback()
-  {
-    
-    Vector Acc = read_accelerometer(file_, acc_sens_);
-    Vector Gyro = read_gyroksop(file_, gyro_sens_);
+        {
+
+          
+          struct Vector Acc = read_accelerometer(file_, acc_sens_);
+          struct Vector Gyro = read_gyroksop(file_, gyro_sens_);
 
 
-    auto message = sensor_msgs::msg::Imu();
-    message.linear_acceleration.x = Acc.x;
-    message.linear_acceleration.y = Acc.y;
-    message.linear_acceleration.z = Acc.z;
+          auto message = sensor_msgs::msg::Imu();
+          message.linear_acceleration.x = Acc.x;
+          message.linear_acceleration.y = Acc.y;
+          message.linear_acceleration.z = Acc.z;
 
-    message.angular_velocity.x = Gyro.x;
-    message.angular_velocity.y = Gyro.y;
-    message.angular_velocity.z = Gyro.z;
+          message.angular_velocity.x = Gyro.x;
+          message.angular_velocity.y = Gyro.y;
+          message.angular_velocity.z = Gyro.z;
 
-    message.orientation_covariance[0] = -1.0;
-    message.header.stamp = this->now();
-    message.header.frame_id = "imu_link";
+          message.orientation_covariance[0] = -1.0;
+          message.header.stamp = this->now();
+          message.header.frame_id = "imu_link";
 
-    publisher_->publish(message);
-  }
-  int file_;
-  int acc_sens_;
-  float gyro_sens_;
-  rclcpp::TimerBase::SharedPtr timer_;
-  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr publisher_;
-  
+          publisher_->publish(message);
+        }
+        int file_;
+        int acc_sens_;
+        float gyro_sens_;
+        rclcpp::TimerBase::SharedPtr timer_;
+        rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr publisher_;
+        
 };
 
 int main(int argc, char * argv[])
